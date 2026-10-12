@@ -31,8 +31,12 @@ RESTART_MAX_MS = 5 * 60 * 1000
 # 请求开始,纯读接口不算)。
 ANCHOR_DELAY_S = 10          # resets_at 之后的缓冲,吸收服务器时钟偏差
 ANCHOR_LATE_LIMIT_S = 300    # 错过锚点超过 5 分钟(如睡眠)就放弃,等真实使用自然开窗
-ANCHOR_PROMPT = "Reply with OK"
+ANCHOR_PROMPT = "你好,你可以做什么?"
 ANCHOR_TIMEOUT_MS = 120_000
+ANCHOR_ATTEMPT_MAX = 3       # 同一锚点最多尝试次数(exec 失败时退避重试)
+ANCHOR_READ_DELAY_MS = 5_000     # exec 成功后稍等再读,避开服务端滚动延迟
+ANCHOR_VERIFY_DELAY_MS = 30_000  # 读回仍是旧窗口(服务端未滚动)时的重读间隔
+ANCHOR_VERIFY_MAX = 3
 
 
 @dataclass
@@ -137,6 +141,17 @@ class CodexClient(QObject):
         self._anchor_proc: QProcess | None = None
         self._last_remaining: int | None = None    # 最近一次主窗口 remaining
         self._last_resets_at: float | None = None  # 最近一次主窗口重置时刻
+        self._anchor_attempts = 0                  # 当前锚点已尝试次数
+        self._anchor_verify: tuple | None = None   # (锚定前 resets_at, ok, 重读次数)
+        self._anchor_read_timer = QTimer(self)
+        self._anchor_read_timer.setSingleShot(True)
+        self._anchor_read_timer.timeout.connect(self._post_anchor_read)
+        self._anchor_verify_timer = QTimer(self)
+        self._anchor_verify_timer.setSingleShot(True)
+        self._anchor_verify_timer.timeout.connect(self.refresh)
+        self._anchor_retry_timer = QTimer(self)
+        self._anchor_retry_timer.setSingleShot(True)
+        self._anchor_retry_timer.timeout.connect(self._maybe_anchor)
 
     # ------------------------------------------------------------------ 公共
 
@@ -359,28 +374,46 @@ class CodexClient(QObject):
         开关:~/.codex-pet/config.json "auto_anchor": true
         (默认关——会自动产生真实请求,须用户知情开启)。
         """
-        if not load_config().get("auto_anchor"):
+        cfg_on = load_config().get("auto_anchor")
+        # 锚定后验证:exec 已成功但服务端可能延迟滚动窗口,读回仍是旧窗口
+        # (resets_at 未变)时,30s 后重读,直到出现新窗口或次数用尽
+        if self._anchor_verify:
+            prev_resets, ok, retries = self._anchor_verify
+            if self._last_resets_at != prev_resets:
+                self._anchor_verify = None
+                self._anchor_log("验证通过:新窗口已生效")
+            elif ok and retries < ANCHOR_VERIFY_MAX:
+                self._anchor_verify = (prev_resets, ok, retries + 1)
+                self._anchor_log(f"读回仍是旧窗口,30s 后重读(第 {retries + 1} 次)")
+                self._anchor_verify_timer.start(ANCHOR_VERIFY_DELAY_MS)
+        if not cfg_on:
             return
         resets_at = self._last_resets_at
         if resets_at is None or resets_at <= time.time():
             return
+        self._anchor_attempts = 0   # 新窗口新锚点,重置尝试计数
         delay_ms = max(1000, int((resets_at + ANCHOR_DELAY_S - time.time()) * 1000))
         self._anchor_timer.start(delay_ms)
+        self._anchor_log(f"锚定已排程:{time.strftime('%H:%M:%S', time.localtime(resets_at + ANCHOR_DELAY_S))}")
 
     def _maybe_anchor(self) -> None:
         """锚定时刻到:通过全部守卫才真正发起锚定请求。"""
         if (not load_config().get("auto_anchor")
                 or getattr(self, "_codex_exe", None) is None
                 or self._last_resets_at is None
-                or self._anchor_proc is not None):
+                or self._anchor_proc is not None
+                or self._anchor_attempts >= ANCHOR_ATTEMPT_MAX):
             return
         late = time.time() - self._last_resets_at
         if late > ANCHOR_LATE_LIMIT_S:
             # 错过太久(如睡眠唤醒):不锚,让用户下次真实使用自然开窗
+            self._anchor_log("错过锚点超 5 分钟,放弃本次锚定")
             return
         self._fire_anchor()
 
     def _fire_anchor(self) -> None:
+        self._anchor_attempts += 1
+        self._anchor_log(f"发起锚定请求(第 {self._anchor_attempts} 次尝试):codex exec")
         proc = QProcess(self)
         proc.setProgram(self._codex_exe)
         proc.setArguments([*self._codex_args, "exec", "--skip-git-repo-check",
@@ -395,14 +428,29 @@ class CodexClient(QObject):
 
     def _kill_stale_anchor(self) -> None:
         if self._anchor_proc is not None:
+            self._anchor_log("锚定请求超时,kill")
             self._anchor_proc.kill()
 
-    def _on_anchor_finished(self, _code, _status) -> None:
+    def _on_anchor_finished(self, code, _status) -> None:
         self._anchor_proc = None
-        # 锚定成功则此次读取拿到新窗口(remaining≈100、resets_at=锚点+5h),
-        # 链式排程下一次;若服务端尚未滚动,退回兜底轮询
-        self.refresh()
+        if code == 0:
+            # exec 成功:稍等服务端记账,再读新窗口(resets_at=锚点+5h,链式排程)
+            self._anchor_log("锚定请求成功,5s 后读取新窗口")
+            self._anchor_verify = (self._last_resets_at, True, 0)
+            self._anchor_read_timer.start(ANCHOR_READ_DELAY_MS)
+        else:
+            # 失败退避重试(受尝试次数与迟到守卫约束)
+            self._anchor_log(f"锚定请求失败(exit={code}),30s 后重试")
+            self._anchor_retry_timer.start(ANCHOR_VERIFY_DELAY_MS)
 
     def _on_anchor_failed(self, _err) -> None:
         self._anchor_proc = None
+        self._anchor_log("锚定进程启动失败,30s 后重试")
+        self._anchor_retry_timer.start(ANCHOR_VERIFY_DELAY_MS)
+
+    def _post_anchor_read(self) -> None:
         self.refresh()
+
+    @staticmethod
+    def _anchor_log(msg: str) -> None:
+        print(f"[codex-pet anchor] {msg}", file=sys.stderr, flush=True)
