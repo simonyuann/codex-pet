@@ -54,8 +54,8 @@ c, fired, refreshed = make_client(True)
 future = time.time() + 3600
 feed(c, 0, future)
 check("未来重置 → 定时器已排程", c._anchor_timer.isActive())
-check("排程时刻 ≈ resets_at+10s",
-      abs(c._anchor_timer.remainingTime() / 1000 - (future + 10 - time.time())) < 2)
+check("排程时刻 ≈ resets_at+5min",
+      abs(c._anchor_timer.remainingTime() / 1000 - (future + 300 - time.time())) < 2)
 
 # 场景2:未用完 → 也排程(每次刷新都锚定,窗口节奏钉死在 5h 网格)
 c2, f2, r2 = make_client(True)
@@ -72,19 +72,19 @@ c4, f4, r4 = make_client(True)
 feed(c4, 0, time.time() - 60)
 check("重置已过 → 不排程", not c4._anchor_timer.isActive())
 
-# 场景5:锚定时刻到 → 发起
+# 场景5:锚定时刻到(+5 分钟) → 发起
 c5, f5, r5 = make_client(True)
 c5._last_remaining = 0
-c5._last_resets_at = time.time() - 2
+c5._last_resets_at = time.time() - 301    # 刚到 +5 分钟触发点
 c5._maybe_anchor()
-check("刚过重置点 → 发起锚定", len(f5) == 1 and c5._anchor_attempts == 1)
+check("到 +5 分钟触发点 → 发起锚定", len(f5) == 1 and c5._anchor_attempts == 1)
 
 # 场景6:错过太久(睡眠)→ 放弃
 c6, f6, r6 = make_client(True)
 c6._last_remaining = 0
-c6._last_resets_at = time.time() - 400
+c6._last_resets_at = time.time() - 700    # 错过 ~11.7 分钟
 c6._maybe_anchor()
-check("错过 >5 分钟 → 放弃锚定", len(f6) == 0)
+check("错过 >10 分钟 → 放弃锚定", len(f6) == 0)
 
 # 场景7:未用完 → 也发起(不再要求耗尽)
 c7, f7, r7 = make_client(True)
