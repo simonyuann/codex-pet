@@ -56,7 +56,8 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent dist/CodexPet.app "$ZIP"
           gh release create "$GITHUB_REF_NAME" "$ZIP" \
             --title "Codex Pet ${GITHUB_REF_NAME}" \
-            --notes "自动构建。macOS(Apple Silicon)为 .app 未公证:首次打开右键 CodexPet.app → 打开,或 \`xattr -cr /Applications/CodexPet.app\`。Windows 为 onefile .exe(PyInstaller 打包,部分杀软可能误报,请从本 Release 页下载)。要求已安装并登录 Codex CLI。"
+            --notes "自动构建。macOS(Apple Silicon)为 .app 未公证:首次打开右键 CodexPet.app → 打开,或 \`xattr -cr /Applications/CodexPet.app\`。Windows 为 onefile .exe(PyInstaller 打包,部分杀软可能误报,请从本 Release 页下载)。要求已安装并登录 Codex CLI。" \
+            || gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
 
   build-windows:
     needs: build-macos  # Release 由 macOS job 创建,Windows job 追加附件
