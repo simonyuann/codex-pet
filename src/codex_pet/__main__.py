@@ -1,6 +1,6 @@
 """Codex Pet 入口:装配数据客户端、显示组件与托盘/菜单栏。
 
-macOS:菜单栏电池图标即主显示,左键弹出详情面板,无悬浮条。
+macOS/Linux:菜单栏或托盘图标即主显示,左键弹出详情面板。
 Windows:任务栏悬浮余额条 + 托盘辅助。
 
 自动检测 Codex 当前使用的提供方(读 ~/.codex/config.toml,每 60 秒):
@@ -45,10 +45,7 @@ def main() -> int:
     tray = Tray()
 
     bar = None
-    if sys.platform.startswith("linux"):
-        from .linux_bar import LinuxBar
-        bar = LinuxBar()
-    elif not IS_MAC:
+    if sys.platform == "win32":
         from .taskbar_bar import TaskbarBar
         bar = TaskbarBar()
 
@@ -105,7 +102,7 @@ def main() -> int:
         push()
 
     def on_show_panel() -> None:
-        """macOS:点击菜单栏图标弹出/收起详情面板。"""
+        """点击托盘或菜单栏图标弹出/收起详情面板。"""
         if panel.isVisible():
             panel.hide_panel()
             return
