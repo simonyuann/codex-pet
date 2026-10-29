@@ -109,8 +109,11 @@ def main() -> int:
         anchor = tray.anchor_point()
         screen = app.screenAt(anchor) or app.primaryScreen()
         avail = screen.availableGeometry()
-        anchor.setY(max(anchor.y(), avail.top()))  # 面板从菜单栏下沿开始
-        panel.popup_near(anchor, avail, [])
+        if sys.platform.startswith("linux"):
+            panel.popup_top_right(avail)
+        else:
+            anchor.setY(max(anchor.y(), avail.top()))  # 面板从菜单栏下沿开始
+            panel.popup_near(anchor, avail, [])
 
     def on_bar_clicked() -> None:
         if panel.isVisible():
