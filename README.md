@@ -28,7 +28,7 @@
 
 ## 环境要求
 
-- Windows 10/11 或 macOS 12+(Apple Silicon)
+- Windows 10/11、macOS 12+(Apple Silicon)或 Linux x86_64
 - 已安装并登录 [Codex CLI](https://developers.openai.com/codex)(即 `codex` 命令可用,ChatGPT Plus 订阅)
 - [uv](https://docs.astral.sh/uv/)(Python 环境管理,仅源码运行需要)
 
@@ -46,6 +46,8 @@ uv run codex-pet
 ```
 
 首次运行会自动解析 `codex` 可执行文件位置并后台拉起 `codex app-server`。
+
+**Linux:** 下载 Release 中的 `CodexPet-v1.5.6-linux-x86_64.tar.gz`，解压后运行 `./CodexPet`。余额条默认位于屏幕可用区域右下角，可拖动、点击查看详情，右键刷新、重置位置或退出。支持系统托盘的桌面环境也可从托盘操作。Linux 版本不支持 Windows 的任务栏锚定和全屏自动隐藏，点击面板外部不会自动收起，可再次点击余额条收起。Wayland 会话需要 XWayland 和 `DISPLAY`；程序默认使用 Qt 的 xcb 后端以支持窗口定位。发行包在 Ubuntu glibc 2.43 上构建，较旧系统请从源码运行或自行构建。
 
 ## 交互
 
@@ -69,6 +71,14 @@ uv run codex-pet
 ```
 
 ## 打包(可选)
+
+**Linux x86_64:**
+
+```bash
+uv run --with pyinstaller pyinstaller --onefile --windowed \
+    --name CodexPet --paths src scripts/launcher.py --noconfirm
+tar -czf CodexPet-linux-x86_64.tar.gz -C dist CodexPet
+```
 
 **Windows exe:**
 

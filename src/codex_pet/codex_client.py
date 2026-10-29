@@ -357,6 +357,12 @@ class CodexClient(QObject):
     def _child_env(self) -> QProcessEnvironment:
         """子进程环境:GUI 启动时 PATH 有限,补常见可执行目录。"""
         env = QProcessEnvironment.systemEnvironment()
+        if sys.platform.startswith("linux") and getattr(sys, "frozen", False):
+            # PyInstaller prepends bundled libraries; external Codex needs its own.
+            if "LD_LIBRARY_PATH_ORIG" in os.environ:
+                env.insert("LD_LIBRARY_PATH", os.environ["LD_LIBRARY_PATH_ORIG"])
+            else:
+                env.remove("LD_LIBRARY_PATH")
         if sys.platform == "darwin":
             extra = ["/opt/homebrew/bin", "/usr/local/bin",
                      os.path.expanduser("~/.local/bin")]
