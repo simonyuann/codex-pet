@@ -194,6 +194,11 @@ class CodexClient(QObject):
         proc.setArguments([*self._codex_args, "app-server"])
         # 保证子进程能读到 HOME/USERPROFILE 下的 ~/.codex
         env = QProcessEnvironment.systemEnvironment()
+        if sys.platform.startswith("linux") and getattr(sys, "frozen", False):
+            if "LD_LIBRARY_PATH_ORIG" in os.environ:
+                env.insert("LD_LIBRARY_PATH", os.environ["LD_LIBRARY_PATH_ORIG"])
+            else:
+                env.remove("LD_LIBRARY_PATH")
         if sys.platform == "darwin":
             # GUI 启动时 PATH 有限:codex 可能是依赖 env node 的脚本垫片,
             # 把常见可执行目录补进 PATH,保证 app-server 能正常拉起

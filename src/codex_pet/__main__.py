@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import signal
 import sys
+import os
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
@@ -31,6 +32,9 @@ def main() -> int:
     # 允许 Ctrl+C 杀掉(Python 默认信号只在外部事件循环触发)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+    # XWayland supports positioning floating windows; native Wayland does not.
+    if sys.platform.startswith("linux") and os.environ.get("DISPLAY"):
+        os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # 由托盘管理退出
     app.setApplicationName("Codex Pet")
@@ -41,7 +45,10 @@ def main() -> int:
     tray = Tray()
 
     bar = None
-    if not IS_MAC:
+    if sys.platform.startswith("linux"):
+        from .linux_bar import LinuxBar
+        bar = LinuxBar()
+    elif not IS_MAC:
         from .taskbar_bar import TaskbarBar
         bar = TaskbarBar()
 
@@ -178,6 +185,7 @@ def main() -> int:
         bar.clicked.connect(on_bar_clicked)
         bar.autoHidden.connect(on_bar_auto_hidden)
         bar.on_refresh = on_refresh_all
+        bar.on_quit = on_quit
         tray.toggleBarRequested.connect(on_toggle_bar)
     else:
         tray.showPanelRequested.connect(on_show_panel)
