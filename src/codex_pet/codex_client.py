@@ -154,7 +154,7 @@ class CodexClient(QObject):
                         candidates.append((found, []))
             return candidates[0] if candidates else (None, [])
 
-        if sys.platform == "darwin":
+        if sys.platform in ("darwin", "linux"):
             home = os.path.expanduser("~")
             for path in (
                 "/opt/homebrew/bin/codex",
@@ -174,6 +174,11 @@ class CodexClient(QObject):
     def refresh(self) -> None:
         """立即拉取一次配额(手动刷新与定时轮询共用)。"""
         if self._proc is None or self._proc.state() == QProcess.ProcessState.NotRunning:
+            if self._codex_exe is None:
+                self._codex_exe, self._codex_args = self._locate_codex()
+                if self._codex_exe is None:
+                    self._set_status("offline")
+                    return
             self._start_process()
             return
         if self._initialized:
@@ -199,11 +204,12 @@ class CodexClient(QObject):
                 env.insert("LD_LIBRARY_PATH", os.environ["LD_LIBRARY_PATH_ORIG"])
             else:
                 env.remove("LD_LIBRARY_PATH")
-        if sys.platform == "darwin":
+        if sys.platform in ("darwin", "linux"):
             # GUI 启动时 PATH 有限:codex 可能是依赖 env node 的脚本垫片,
             # 把常见可执行目录补进 PATH,保证 app-server 能正常拉起
             extra = ["/opt/homebrew/bin", "/usr/local/bin",
-                     os.path.expanduser("~/.local/bin")]
+                     os.path.expanduser("~/.local/bin"),
+                     os.path.expanduser("~/.npm-global/bin")]
             env.insert("PATH", ":".join(extra) + ":"
                        + (env.value("PATH") or "/usr/bin:/bin:/usr/sbin:/sbin"))
         proc.setProcessEnvironment(env)
