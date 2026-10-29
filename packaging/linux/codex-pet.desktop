@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Codex Pet
+Comment=Display Codex and DeepSeek balances
+Exec=/usr/bin/codex-pet
+Icon=codex-pet
+Terminal=false
+Categories=Utility;
