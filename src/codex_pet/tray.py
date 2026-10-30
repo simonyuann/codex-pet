@@ -10,6 +10,7 @@ Windows:托盘图标为辅助,左键切换悬浮余额条,右键走原生菜单�
 from __future__ import annotations
 
 import sys
+import os
 
 from PyQt6.QtCore import QObject, QPoint, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (QAction, QColor, QCursor, QFont, QFontMetrics,
@@ -136,7 +137,23 @@ class Tray(QObject):
             pass
         else:
             self.icon.setContextMenu(self._menu)
-        self.icon.show()
+        self._native = None
+        self._native_anchor = None
+        if (sys.platform.startswith('linux') and os.environ.get('WAYLAND_DISPLAY')
+                and 'KDE' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper()):
+            try:
+                from .linux_tray import LinuxStatusNotifier
+                self._native = LinuxStatusNotifier(self.icon.icon(), self)
+                self._native.activated.connect(self._native_activate)
+                self._native.context.connect(self._menu.popup)
+            except RuntimeError:
+                self._native = None
+        if self._native is None:
+            self.icon.show()
+
+    def _native_activate(self, pos: QPoint) -> None:
+        self._native_anchor = pos
+        self.showPanelRequested.emit()
 
     def _on_activated(self, reason) -> None:
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
@@ -150,6 +167,8 @@ class Tray(QObject):
 
     def anchor_point(self) -> QPoint:
         """详情面板锚点:状态项下沿中点;取不到几何时回退鼠标位置。"""
+        if self._native_anchor is not None:
+            return self._native_anchor
         g = self.icon.geometry()
         cursor = QCursor.pos()
         # Linux StatusNotifier hosts may report a valid but unrelated geometry
@@ -175,6 +194,9 @@ class Tray(QObject):
                 sym = {"CNY": "¥", "USD": "$"}.get((ds or {}).get("currency"), "¥")
                 tip = f"DeepSeek 余额 {sym}{total:,.2f}"
             self.icon.setToolTip(tip)
+            if self._native is not None:
+                self._native.set_icon(self.icon.icon())
+                self._native.set_title(tip)
             return
 
         codex = payload.get("codex") or {}
@@ -187,6 +209,9 @@ class Tray(QObject):
         else:
             tip = f"Codex 剩余 {remaining}%(点击查看详情)"
         self.icon.setToolTip(tip)
+        if self._native is not None:
+            self._native.set_icon(self.icon.icon())
+            self._native.set_title(tip)
 
     def set_bar_visible(self, visible: bool) -> None:
         if self.toggle_action is not None:

@@ -47,7 +47,7 @@ uv run codex-pet
 
 首次运行会自动解析 `codex` 可执行文件位置并后台拉起 `codex app-server`。
 
-**Linux:** 下载 Release 中的 `codex-pet_1.5.12_amd64.deb`，通过 `sudo apt install ./codex-pet_1.5.12_amd64.deb` 安装，然后从应用菜单或运行 `codex-pet` 启动。左键点击系统托盘图标弹出或收起详情，右键可刷新或退出；需要支持系统托盘的桌面环境。点击面板外部不会自动收起，可再次点击图标收起。Wayland 会话需要 XWayland 和 `DISPLAY`；程序默认使用 Qt 的 xcb 后端以支持窗口定位。发行包在 Ubuntu 26.04、glibc 2.43 上构建，较旧系统请从源码运行或自行构建。
+**Linux:** 下载 Release 中的 `codex-pet_1.5.13_amd64.deb`，通过 `sudo apt install ./codex-pet_1.5.13_amd64.deb` 安装，然后从应用菜单或运行 `codex-pet` 启动。左键点击系统托盘图标弹出或收起详情，右键可刷新或退出；需要支持系统托盘的桌面环境。点击面板外部不会自动收起，可再次点击图标收起。Wayland 会话需要 XWayland 和 `DISPLAY`；程序默认使用 Qt 的 xcb 后端以支持窗口定位。发行包在 Ubuntu 26.04、glibc 2.43 上构建，较旧系统请从源码运行或自行构建。
 
 Linux 启动 Codex 时优先使用进程已有的代理环境变量；未设置时读取 KDE 或 GNOME 的手动代理配置。自动代理脚本和其他桌面的代理配置需要自行设置环境变量。
 

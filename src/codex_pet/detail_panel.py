@@ -314,7 +314,7 @@ class DetailPanel(QWidget):
         self._show_at(x, y, keep_rects)
 
     def _position_below_tray(self, anchor, screen_rect: QRect) -> None:
-        x = max(screen_rect.left(), min(anchor.x() - self.width() // 2,
+        x = max(screen_rect.left(), min(anchor.x(),
                                         screen_rect.right() - self.width() + 1))
         y = anchor.y() + 1
         if y + self.height() - 1 > screen_rect.bottom():

@@ -35,12 +35,12 @@ class InspectTray(Tray):
             assert panel.isVisible()
             screen = panel.screen() or QApplication.primaryScreen()
             available = screen.availableGeometry()
-            assert panel.geometry().center().x() in (399, 400)
+            assert panel.geometry().left() == 400
             assert panel.geometry().top() == 24
             panel.set_state({'active': 'deepseek', 'ds_status': 'online',
                              'deepseek': {'total': 1234567.89, 'currency': 'CNY'}})
             QApplication.processEvents()
-            assert panel.geometry().center().x() in (399, 400)
+            assert panel.geometry().left() == 400
             panel.set_state({'codex': {'plan_type': 'pro'}})
             assert panel.plan_label.text() == "ChatGPT Pro 配额"
             assert "Plus" not in panel.codex_header.text()
