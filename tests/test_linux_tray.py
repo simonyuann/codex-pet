@@ -5,8 +5,9 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from PyQt6.QtCore import QPoint, QTimer
+from PyQt6.QtCore import QPoint, QRect, QTimer
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon
+from codex_pet.tray import QCursor
 import codex_pet.__main__ as entry
 from codex_pet.detail_panel import DetailPanel
 from codex_pet.tray import Tray
@@ -22,6 +23,12 @@ class InspectTray(Tray):
     def check(self):
         try:
             assert self.toggle_action is None
+            with patch.object(self.icon, 'geometry', return_value=QRect(10, 0, 24, 24)), \
+                 patch.object(QCursor, 'pos', return_value=QPoint(1200, 20)):
+                assert Tray.anchor_point(self) == QPoint(1200, 20)
+            with patch.object(self.icon, 'geometry', return_value=QRect(1190, 0, 24, 24)), \
+                 patch.object(QCursor, 'pos', return_value=QPoint(1200, 20)):
+                assert Tray.anchor_point(self) == QPoint(1201, 23)
             panel = next(w for w in QApplication.topLevelWidgets() if isinstance(w, DetailPanel))
             assert not panel.isVisible()
             self._on_activated(QSystemTrayIcon.ActivationReason.Trigger)
@@ -39,6 +46,9 @@ class InspectTray(Tray):
             assert "Plus" not in panel.codex_header.text()
             self._on_activated(QSystemTrayIcon.ActivationReason.Trigger)
             assert not panel.isVisible()
+            panel.popup_below_tray(QPoint(400, 599), QRect(0, 0, 800, 600))
+            assert panel.geometry().bottom() < 599
+            panel.hide_panel()
             print('Linux tray panel toggle: PASS')
         except BaseException as exc:
             print('Linux tray panel toggle: FAIL', repr(exc))

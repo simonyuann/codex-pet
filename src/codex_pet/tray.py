@@ -151,9 +151,13 @@ class Tray(QObject):
     def anchor_point(self) -> QPoint:
         """详情面板锚点:状态项下沿中点;取不到几何时回退鼠标位置。"""
         g = self.icon.geometry()
+        cursor = QCursor.pos()
+        # Linux StatusNotifier hosts may report a valid but unrelated geometry
+        # (often on the primary monitor). Trust it only near the actual click.
         if g.isValid() and not g.isNull():
-            return QPoint(g.center().x(), g.bottom())
-        return QCursor.pos()
+            if not sys.platform.startswith("linux") or g.adjusted(-32, -32, 32, 32).contains(cursor):
+                return QPoint(g.center().x(), g.bottom())
+        return cursor
 
     def update_payload(self, payload: dict) -> None:
         """根据统一状态快照更新图标与提示。"""

@@ -316,8 +316,10 @@ class DetailPanel(QWidget):
     def _position_below_tray(self, anchor, screen_rect: QRect) -> None:
         x = max(screen_rect.left(), min(anchor.x() - self.width() // 2,
                                         screen_rect.right() - self.width() + 1))
-        y = max(screen_rect.top(), min(anchor.y() + 1,
-                                       screen_rect.bottom() - self.height() + 1))
+        y = anchor.y() + 1
+        if y + self.height() - 1 > screen_rect.bottom():
+            y = anchor.y() - self.height()
+        y = max(screen_rect.top(), min(y, screen_rect.bottom() - self.height() + 1))
         self.move(x, y)
 
     def popup_below_tray(self, anchor, screen_rect: QRect) -> None:
