@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QPoint, QTimer
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon
 import codex_pet.__main__ as entry
 from codex_pet.detail_panel import DetailPanel
@@ -16,6 +16,9 @@ class InspectTray(Tray):
         super().__init__()
         QTimer.singleShot(0, self.check)
 
+    def anchor_point(self):
+        return QPoint(400, 23)
+
     def check(self):
         try:
             assert self.toggle_action is None
@@ -25,12 +28,15 @@ class InspectTray(Tray):
             assert panel.isVisible()
             screen = panel.screen() or QApplication.primaryScreen()
             available = screen.availableGeometry()
-            assert panel.geometry().right() == available.right()
-            assert panel.geometry().top() == available.top()
+            assert panel.geometry().center().x() in (399, 400)
+            assert panel.geometry().top() == 24
             panel.set_state({'active': 'deepseek', 'ds_status': 'online',
                              'deepseek': {'total': 1234567.89, 'currency': 'CNY'}})
             QApplication.processEvents()
-            assert panel.geometry().right() == available.right()
+            assert panel.geometry().center().x() in (399, 400)
+            panel.set_state({'codex': {'plan_type': 'pro'}})
+            assert panel.plan_label.text() == "ChatGPT Pro 配额"
+            assert "Plus" not in panel.codex_header.text()
             self._on_activated(QSystemTrayIcon.ActivationReason.Trigger)
             assert not panel.isVisible()
             print('Linux tray panel toggle: PASS')

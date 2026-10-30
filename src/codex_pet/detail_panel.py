@@ -115,7 +115,7 @@ class DetailPanel(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
         self._payload: dict = {}
-        self._right_align_rect: QRect | None = None
+        self._tray_anchor: tuple | None = None
         self._keep_rects: list[QRect] = []  # 点击这些区域内不关闭(面板自身 + 余额条)
         self._prev_held = False             # 上次轮询时鼠标按住状态(用于按下沿检测)
         # 刷新反馈:进行中禁用按钮;updated_at 变化 = 拿到新数据;超时提示
@@ -173,7 +173,7 @@ class DetailPanel(QWidget):
         root.addWidget(self.ds_group)
 
         # ---- ChatGPT Plus 配额分组 ----
-        self.codex_header = QLabel("ChatGPT Plus 配额")
+        self.codex_header = QLabel("ChatGPT 配额")
         self.codex_header.setStyleSheet("font-weight: bold; color: #444; font-size: 12px;")
         root.addWidget(self.codex_header)
 
@@ -252,7 +252,7 @@ class DetailPanel(QWidget):
         # Codex 分组
         if codex:
             plan = codex.get("plan_type")
-            self.plan_label.setText(f"ChatGPT Plus 配额 · {PLAN_NAMES.get(plan, plan or '?')}")
+            self.plan_label.setText(f"{PLAN_NAMES.get(plan, plan or 'ChatGPT')} 配额")
             self.primary_row.update_data(codex.get("primary"))
             self.secondary_row.update_data(codex.get("secondary"))
             updated_at = codex.get("updated_at")
@@ -262,14 +262,13 @@ class DetailPanel(QWidget):
             else:
                 self.updated_label.setText("")
         else:
-            self.plan_label.setText("ChatGPT Plus 配额(离线)")
+            self.plan_label.setText("ChatGPT 配额(离线)")
             self.primary_row.update_data(None)
             self.secondary_row.update_data(None)
             self.updated_label.setText("等待数据…")
         self.adjustSize()
-        if self._right_align_rect is not None and self.isVisible():
-            rect = self._right_align_rect
-            self.move(max(rect.left(), rect.right() - self.width() + 1), rect.top())
+        if self._tray_anchor is not None and self.isVisible():
+            self._position_below_tray(*self._tray_anchor)
 
     def _update_deepseek(self, ds: dict | None, status: str,
                          is_active: bool, model: str | None = None) -> None:
@@ -304,7 +303,7 @@ class DetailPanel(QWidget):
 
         keep_rects:除面板自身外,点击这些区域(如余额条)也不触发关闭。
         """
-        self._right_align_rect = None
+        self._tray_anchor = None
         self._refresh_labels()
         w, h = self.width(), self.height()
         x = anchor_global_pos.x() - w - 12
@@ -314,12 +313,19 @@ class DetailPanel(QWidget):
                 min(anchor_global_pos.y(), screen_rect.bottom() - h))
         self._show_at(x, y, keep_rects)
 
-    def popup_top_right(self, screen_rect: QRect) -> None:
-        """Linux:将详情紧贴当前屏幕可用区域的右上角。"""
-        self._right_align_rect = QRect(screen_rect)
+    def _position_below_tray(self, anchor, screen_rect: QRect) -> None:
+        x = max(screen_rect.left(), min(anchor.x() - self.width() // 2,
+                                        screen_rect.right() - self.width() + 1))
+        y = max(screen_rect.top(), min(anchor.y() + 1,
+                                       screen_rect.bottom() - self.height() + 1))
+        self.move(x, y)
+
+    def popup_below_tray(self, anchor, screen_rect: QRect) -> None:
+        """Place the panel directly below the tray icon, within the screen."""
+        self._tray_anchor = (anchor, QRect(screen_rect))
         self._refresh_labels()
-        x = max(screen_rect.left(), screen_rect.right() - self.width() + 1)
-        self._show_at(x, screen_rect.top(), [])
+        self._position_below_tray(*self._tray_anchor)
+        self._show_at(self.x(), self.y(), [])
 
     def _show_at(self, x: int, y: int, keep_rects: list[QRect] | None) -> None:
         self._refresh_labels()

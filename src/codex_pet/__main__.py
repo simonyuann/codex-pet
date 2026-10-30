@@ -110,7 +110,7 @@ def main() -> int:
         screen = app.screenAt(anchor) or app.primaryScreen()
         avail = screen.availableGeometry()
         if sys.platform.startswith("linux"):
-            panel.popup_top_right(avail)
+            panel.popup_below_tray(anchor, screen.geometry())
         else:
             anchor.setY(max(anchor.y(), avail.top()))  # 面板从菜单栏下沿开始
             panel.popup_near(anchor, avail, [])
